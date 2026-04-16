@@ -1347,12 +1347,12 @@ func resourceComputeRegionInstanceTemplateCreate(d *schema.ResourceData, meta in
 		NetworkPerformanceConfig:   networkPerformanceConfig,
 		Scheduling:                 scheduling,
 		ServiceAccounts:            expandServiceAccounts(d.Get("service_account").([]interface{})),
-		Tags:                       resourceInstanceTags(d),
-		ConfidentialInstanceConfig: expandConfidentialInstanceConfig(d),
-		ShieldedInstanceConfig:     expandShieldedVmConfigs(d),
-		AdvancedMachineFeatures:    expandAdvancedMachineFeatures(d),
+		Tags:                       resourceInstanceTagsStruct(d),
+		ConfidentialInstanceConfig: expandConfidentialInstanceConfigStruct(d),
+		ShieldedInstanceConfig:     expandShieldedVmConfigsStruct(d),
+		AdvancedMachineFeatures:    expandAdvancedMachineFeaturesStruct(d),
 {{- if ne $.TargetVersionName "ga" }}
-		DisplayDevice:              expandDisplayDevice(d),
+		DisplayDevice:              expandDisplayDeviceStruct(d),
 {{- end }}
 		ResourcePolicies:           resourcePolicies,
 		ReservationAffinity:        reservationAffinity,
@@ -1630,24 +1630,24 @@ func resourceComputeRegionInstanceTemplateRead(d *schema.ResourceData, meta inte
 		}
 	}
 	if instanceProperties.ShieldedInstanceConfig != nil {
-		if err = d.Set("shielded_instance_config", flattenShieldedVmConfig(instanceProperties.ShieldedInstanceConfig)); err != nil {
+		if err = d.Set("shielded_instance_config", flattenShieldedVmConfigStruct(instanceProperties.ShieldedInstanceConfig)); err != nil {
 			return fmt.Errorf("Error setting shielded_instance_config: %s", err)
 		}
 	}
 
 	if instanceProperties.ConfidentialInstanceConfig != nil {
-		if err = d.Set("confidential_instance_config", flattenConfidentialInstanceConfig(instanceProperties.ConfidentialInstanceConfig)); err != nil {
+		if err = d.Set("confidential_instance_config", flattenConfidentialInstanceConfigStruct(instanceProperties.ConfidentialInstanceConfig)); err != nil {
 			return fmt.Errorf("Error setting confidential_instance_config: %s", err)
 		}
 	}
 	if instanceProperties.AdvancedMachineFeatures != nil {
-		if err = d.Set("advanced_machine_features", flattenAdvancedMachineFeatures(instanceProperties.AdvancedMachineFeatures)); err != nil {
+		if err = d.Set("advanced_machine_features", flattenAdvancedMachineFeaturesStruct(instanceProperties.AdvancedMachineFeatures)); err != nil {
 			return fmt.Errorf("Error setting advanced_machine_features: %s", err)
 		}
 	}
 {{- if ne $.TargetVersionName "ga" }}
 	if instanceProperties.DisplayDevice != nil {
-		if err = d.Set("enable_display", flattenEnableDisplay(instanceProperties.DisplayDevice)); err != nil {
+		if err = d.Set("enable_display", flattenEnableDisplayStruct(instanceProperties.DisplayDevice)); err != nil {
 			return fmt.Errorf("Error setting enable_display: %s", err)
 		}
 	}

@@ -1832,7 +1832,7 @@ func expandComputeInstance(project string, d *schema.ResourceData, config *trans
 		Name:                       d.Get("name").(string),
 		NetworkInterfaces:          networkInterfaces,
 		NetworkPerformanceConfig:   networkPerformanceConfig,
-		Tags:                       resourceInstanceTags(d),
+		Tags:                       resourceInstanceTagsStruct(d),
 		Params:                     params,
 		Labels:                     tpgresource.ExpandEffectiveLabels(d),
 		ServiceAccounts:            expandServiceAccounts(d.Get("service_account").([]interface{})),
@@ -1842,10 +1842,10 @@ func expandComputeInstance(project string, d *schema.ResourceData, config *trans
 		DeletionProtection:         d.Get("deletion_protection").(bool),
 		Hostname:                   d.Get("hostname").(string),
 		ForceSendFields:            []string{"CanIpForward", "DeletionProtection"},
-		ConfidentialInstanceConfig: expandConfidentialInstanceConfig(d),
-		AdvancedMachineFeatures:    expandAdvancedMachineFeatures(d),
-		ShieldedInstanceConfig:     expandShieldedVmConfigs(d),
-		DisplayDevice:              expandDisplayDevice(d),
+		ConfidentialInstanceConfig: expandConfidentialInstanceConfigStruct(d),
+		AdvancedMachineFeatures:    expandAdvancedMachineFeaturesStruct(d),
+		ShieldedInstanceConfig:     expandShieldedVmConfigsStruct(d),
+		DisplayDevice:              expandDisplayDeviceStruct(d),
 		ResourcePolicies:           tpgresource.ConvertStringArr(d.Get("resource_policies").([]interface{})),
 		ReservationAffinity:        reservationAffinity,
 		KeyRevocationActionType:    d.Get("key_revocation_action_type").(string),
@@ -2258,10 +2258,10 @@ func resourceComputeInstanceRead(d *schema.ResourceData, meta interface{}) error
 	if err := d.Set("guest_accelerator", flattenGuestAccelerators(instance.GuestAccelerators)); err != nil {
 		return fmt.Errorf("Error setting guest_accelerator: %s", err)
 	}
-	if err := d.Set("shielded_instance_config", flattenShieldedVmConfig(instance.ShieldedInstanceConfig)); err != nil {
+	if err := d.Set("shielded_instance_config", flattenShieldedVmConfigStruct(instance.ShieldedInstanceConfig)); err != nil {
 		return fmt.Errorf("Error setting shielded_instance_config: %s", err)
 	}
-	if err := d.Set("enable_display", flattenEnableDisplay(instance.DisplayDevice)); err != nil {
+	if err := d.Set("enable_display", flattenEnableDisplayStruct(instance.DisplayDevice)); err != nil {
 		return fmt.Errorf("Error setting enable_display: %s", err)
 	}
 	if err := d.Set("cpu_platform", instance.CpuPlatform); err != nil {
@@ -2300,10 +2300,10 @@ func resourceComputeInstanceRead(d *schema.ResourceData, meta interface{}) error
 	if err := d.Set("current_status", instance.Status); err != nil {
 		return fmt.Errorf("Error setting current_status: %s", err)
 	}
-	if err := d.Set("confidential_instance_config", flattenConfidentialInstanceConfig(instance.ConfidentialInstanceConfig)); err != nil {
+	if err := d.Set("confidential_instance_config", flattenConfidentialInstanceConfigStruct(instance.ConfidentialInstanceConfig)); err != nil {
 		return fmt.Errorf("Error setting confidential_instance_config: %s", err)
 	}
-	if err := d.Set("advanced_machine_features", flattenAdvancedMachineFeatures(instance.AdvancedMachineFeatures)); err != nil {
+	if err := d.Set("advanced_machine_features", flattenAdvancedMachineFeaturesStruct(instance.AdvancedMachineFeatures)); err != nil {
 		return fmt.Errorf("Error setting advanced_machine_features: %s", err)
 	}
 	if d.Get("desired_status") != "" {
@@ -3156,7 +3156,7 @@ func resourceComputeInstanceUpdate(d *schema.ResourceData, meta interface{}) err
 		}
 
 		if d.HasChange("shielded_instance_config") {
-			shieldedVmConfig := expandShieldedVmConfigs(d)
+			shieldedVmConfig := expandShieldedVmConfigsStruct(d)
 
 			op, err := config.NewComputeClient(userAgent).Instances.UpdateShieldedInstanceConfig(project, zone, instance.Name, shieldedVmConfig).Do()
 			if err != nil {
@@ -3200,7 +3200,7 @@ func resourceComputeInstanceUpdate(d *schema.ResourceData, meta interface{}) err
 						return fmt.Errorf("Error retrieving instance: %s", err)
 					}
 
-					instance.AdvancedMachineFeatures = expandAdvancedMachineFeatures(d)
+					instance.AdvancedMachineFeatures = expandAdvancedMachineFeaturesStruct(d)
 
 					op, err := config.NewComputeClient(userAgent).Instances.Update(project, zone, instance.Name, instance).Do()
 					if err != nil {

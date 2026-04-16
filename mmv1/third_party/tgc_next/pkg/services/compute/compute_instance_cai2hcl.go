@@ -83,8 +83,8 @@ func (c *ComputeInstanceCai2hclConverter) convertResourceData(asset caiasset.Ass
 
 	hclData["scheduling"] = flattenSchedulingTgc(instance.Scheduling)
 	hclData["guest_accelerator"] = flattenGuestAcceleratorsTgc(instance.GuestAccelerators)
-	hclData["shielded_instance_config"] = flattenShieldedVmConfig(instance.ShieldedInstanceConfig)
-	hclData["enable_display"] = flattenEnableDisplay(instance.DisplayDevice)
+	hclData["shielded_instance_config"] = flattenShieldedVmConfigStruct(instance.ShieldedInstanceConfig)
+	hclData["enable_display"] = flattenEnableDisplayStruct(instance.DisplayDevice)
 	hclData["min_cpu_platform"] = instance.MinCpuPlatform
 
 	// Only convert the field when its value is not default false
@@ -95,8 +95,8 @@ func (c *ComputeInstanceCai2hclConverter) convertResourceData(asset caiasset.Ass
 	hclData["name"] = instance.Name
 	hclData["description"] = instance.Description
 	hclData["hostname"] = instance.Hostname
-	hclData["confidential_instance_config"] = flattenConfidentialInstanceConfig(instance.ConfidentialInstanceConfig)
-	hclData["advanced_machine_features"] = flattenAdvancedMachineFeatures(instance.AdvancedMachineFeatures)
+	hclData["confidential_instance_config"] = flattenConfidentialInstanceConfigStruct(instance.ConfidentialInstanceConfig)
+	hclData["advanced_machine_features"] = flattenAdvancedMachineFeaturesStruct(instance.AdvancedMachineFeatures)
 	hclData["reservation_affinity"] = flattenReservationAffinityTgc(instance.ReservationAffinity)
 	hclData["key_revocation_action_type"] = strings.TrimSuffix(instance.KeyRevocationActionType, "_ON_KEY_REVOCATION")
 	hclData["instance_encryption_key"] = flattenComputeInstanceEncryptionKey(instance.InstanceEncryptionKey)

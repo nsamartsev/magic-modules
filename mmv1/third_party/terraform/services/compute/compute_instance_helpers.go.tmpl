@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -747,67 +748,167 @@ func flattenGuestAccelerators(accelerators []*compute.AcceleratorConfig) []map[s
 	return acceleratorsSchema
 }
 
-func resourceInstanceTags(d tpgresource.TerraformResourceData) *compute.Tags {
-	// Calculate the tags
-	var tags *compute.Tags
-	if v := d.Get("tags"); v != nil {
-		vs := v.(*schema.Set)
-		tags = new(compute.Tags)
-		tags.Items = make([]string, vs.Len())
-		for i, v := range vs.List() {
-			tags.Items[i] = v.(string)
-		}
-
-		tags.Fingerprint = d.Get("tags_fingerprint").(string)
+// structToMapJSON converts a typed struct to map[string]interface{} via JSON,
+// preserving the struct's MarshalJSON semantics (including ForceSendFields).
+// TODO(migration): remove together with the *Struct adapters in PR 8.
+func structToMapJSON(item interface{}) (map[string]interface{}, error) {
+	b, err := json.Marshal(item)
+	if err != nil {
+		return nil, err
 	}
-
-	return tags
+	out := make(map[string]interface{})
+	if err := json.Unmarshal(b, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func expandShieldedVmConfigs(d tpgresource.TerraformResourceData) *compute.ShieldedInstanceConfig {
+// mapToStructJSON copies a map[string]interface{} into a typed struct via JSON.
+// TODO(migration): remove together with the *Struct adapters in PR 8.
+func mapToStructJSON(src interface{}, dst interface{}) error {
+	b, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, dst)
+}
+
+func resourceInstanceTags(d tpgresource.TerraformResourceData) map[string]interface{} {
+	v := d.Get("tags")
+	if v == nil {
+		return nil
+	}
+	vs := v.(*schema.Set)
+	typed := new(compute.Tags)
+	typed.Items = make([]string, vs.Len())
+	for i, v := range vs.List() {
+		typed.Items[i] = v.(string)
+	}
+	typed.Fingerprint = d.Get("tags_fingerprint").(string)
+
+	m, err := structToMapJSON(typed)
+	if err != nil {
+		return nil
+	}
+	return m
+}
+
+// resourceInstanceTagsStruct is a temporary adapter returning a typed
+// *compute.Tags for callers still constructing typed request objects.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func resourceInstanceTagsStruct(d tpgresource.TerraformResourceData) *compute.Tags {
+	m := resourceInstanceTags(d)
+	if m == nil {
+		return nil
+	}
+	out := &compute.Tags{}
+	if err := mapToStructJSON(m, out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func expandShieldedVmConfigs(d tpgresource.TerraformResourceData) map[string]interface{} {
 	if _, ok := d.GetOk("shielded_instance_config"); !ok {
 		return nil
 	}
 
 	prefix := "shielded_instance_config.0"
-	return &compute.ShieldedInstanceConfig{
+	typed := &compute.ShieldedInstanceConfig{
 		EnableSecureBoot:          d.Get(prefix + ".enable_secure_boot").(bool),
 		EnableVtpm:                d.Get(prefix + ".enable_vtpm").(bool),
 		EnableIntegrityMonitoring: d.Get(prefix + ".enable_integrity_monitoring").(bool),
 		ForceSendFields:           []string{"EnableSecureBoot", "EnableVtpm", "EnableIntegrityMonitoring"},
 	}
+	m, err := structToMapJSON(typed)
+	if err != nil {
+		return nil
+	}
+	return m
 }
 
-func expandConfidentialInstanceConfig(d tpgresource.TerraformResourceData) *compute.ConfidentialInstanceConfig {
+// expandShieldedVmConfigsStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func expandShieldedVmConfigsStruct(d tpgresource.TerraformResourceData) *compute.ShieldedInstanceConfig {
+	m := expandShieldedVmConfigs(d)
+	if m == nil {
+		return nil
+	}
+	out := &compute.ShieldedInstanceConfig{}
+	if err := mapToStructJSON(m, out); err != nil {
+		return nil
+	}
+	// ForceSendFields is not serialized to JSON, so it is lost during the
+	// map roundtrip. Restore it so false bools are still sent to the API.
+	out.ForceSendFields = []string{"EnableSecureBoot", "EnableVtpm", "EnableIntegrityMonitoring"}
+	return out
+}
+
+func expandConfidentialInstanceConfig(d tpgresource.TerraformResourceData) map[string]interface{} {
 	if _, ok := d.GetOk("confidential_instance_config"); !ok {
 		return nil
 	}
 
 	prefix := "confidential_instance_config.0"
-	return &compute.ConfidentialInstanceConfig{
+	typed := &compute.ConfidentialInstanceConfig{
 		EnableConfidentialCompute: d.Get(prefix + ".enable_confidential_compute").(bool),
-		ConfidentialInstanceType: d.Get(prefix + ".confidential_instance_type").(string),
+		ConfidentialInstanceType:  d.Get(prefix + ".confidential_instance_type").(string),
 	}
+	m, err := structToMapJSON(typed)
+	if err != nil {
+		return nil
+	}
+	return m
 }
 
-func flattenConfidentialInstanceConfig(ConfidentialInstanceConfig *compute.ConfidentialInstanceConfig) []map[string]interface{} {
-	if ConfidentialInstanceConfig == nil {
+// expandConfidentialInstanceConfigStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func expandConfidentialInstanceConfigStruct(d tpgresource.TerraformResourceData) *compute.ConfidentialInstanceConfig {
+	m := expandConfidentialInstanceConfig(d)
+	if m == nil {
+		return nil
+	}
+	out := &compute.ConfidentialInstanceConfig{}
+	if err := mapToStructJSON(m, out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func flattenConfidentialInstanceConfig(confidentialInstanceConfig map[string]interface{}) []map[string]interface{} {
+	if confidentialInstanceConfig == nil {
 		return nil
 	}
 
+	enableConfidentialCompute, _ := confidentialInstanceConfig["enableConfidentialCompute"].(bool)
+	confidentialInstanceType, _ := confidentialInstanceConfig["confidentialInstanceType"].(string)
+
 	return []map[string]interface{}{{"{{"}}
-		"enable_confidential_compute": ConfidentialInstanceConfig.EnableConfidentialCompute,
-		"confidential_instance_type": ConfidentialInstanceConfig.ConfidentialInstanceType,
+		"enable_confidential_compute": enableConfidentialCompute,
+		"confidential_instance_type":  confidentialInstanceType,
 	{{"}}"}}
 }
 
-func expandAdvancedMachineFeatures(d tpgresource.TerraformResourceData) *compute.AdvancedMachineFeatures {
+// flattenConfidentialInstanceConfigStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func flattenConfidentialInstanceConfigStruct(v *compute.ConfidentialInstanceConfig) []map[string]interface{} {
+	if v == nil {
+		return nil
+	}
+	m, err := structToMapJSON(v)
+	if err != nil {
+		return nil
+	}
+	return flattenConfidentialInstanceConfig(m)
+}
+
+func expandAdvancedMachineFeatures(d tpgresource.TerraformResourceData) map[string]interface{} {
 	if _, ok := d.GetOk("advanced_machine_features"); !ok {
 		return nil
 	}
 
 	prefix := "advanced_machine_features.0"
-	return &compute.AdvancedMachineFeatures{
+	typed := &compute.AdvancedMachineFeatures{
 		EnableNestedVirtualization: d.Get(prefix + ".enable_nested_virtualization").(bool),
 		ThreadsPerCore:             int64(d.Get(prefix + ".threads_per_core").(int)),
 		TurboMode:                  d.Get(prefix + ".turbo_mode").(string),
@@ -815,50 +916,159 @@ func expandAdvancedMachineFeatures(d tpgresource.TerraformResourceData) *compute
 		PerformanceMonitoringUnit:  d.Get(prefix + ".performance_monitoring_unit").(string),
 		EnableUefiNetworking:       d.Get(prefix + ".enable_uefi_networking").(bool),
 	}
-}
-
-func flattenAdvancedMachineFeatures(AdvancedMachineFeatures *compute.AdvancedMachineFeatures) []map[string]interface{} {
-	if AdvancedMachineFeatures == nil {
+	m, err := structToMapJSON(typed)
+	if err != nil {
 		return nil
 	}
+	return m
+}
+
+// expandAdvancedMachineFeaturesStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func expandAdvancedMachineFeaturesStruct(d tpgresource.TerraformResourceData) *compute.AdvancedMachineFeatures {
+	m := expandAdvancedMachineFeatures(d)
+	if m == nil {
+		return nil
+	}
+	out := &compute.AdvancedMachineFeatures{}
+	if err := mapToStructJSON(m, out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func flattenAdvancedMachineFeatures(advancedMachineFeatures map[string]interface{}) []map[string]interface{} {
+	if advancedMachineFeatures == nil {
+		return nil
+	}
+	getBool := func(k string) bool {
+		b, _ := advancedMachineFeatures[k].(bool)
+		return b
+	}
+	getString := func(k string) string {
+		s, _ := advancedMachineFeatures[k].(string)
+		return s
+	}
+	getInt64 := func(k string) int64 {
+		switch n := advancedMachineFeatures[k].(type) {
+		case float64:
+			return int64(n)
+		case int64:
+			return n
+		case int:
+			return int64(n)
+		case string:
+			i, _ := strconv.ParseInt(n, 10, 64)
+			return i
+		}
+		return 0
+	}
 	return []map[string]interface{}{{"{{"}}
-		"enable_nested_virtualization": AdvancedMachineFeatures.EnableNestedVirtualization,
-		"threads_per_core":             AdvancedMachineFeatures.ThreadsPerCore,
-		"turbo_mode":                   AdvancedMachineFeatures.TurboMode,
-		"visible_core_count":           AdvancedMachineFeatures.VisibleCoreCount,
-		"performance_monitoring_unit":  AdvancedMachineFeatures.PerformanceMonitoringUnit,
-		"enable_uefi_networking":       AdvancedMachineFeatures.EnableUefiNetworking,
+		"enable_nested_virtualization": getBool("enableNestedVirtualization"),
+		"threads_per_core":             getInt64("threadsPerCore"),
+		"turbo_mode":                   getString("turboMode"),
+		"visible_core_count":           getInt64("visibleCoreCount"),
+		"performance_monitoring_unit":  getString("performanceMonitoringUnit"),
+		"enable_uefi_networking":       getBool("enableUefiNetworking"),
 	{{"}}"}}
 }
 
-func flattenShieldedVmConfig(shieldedVmConfig *compute.ShieldedInstanceConfig) []map[string]bool {
+// flattenAdvancedMachineFeaturesStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func flattenAdvancedMachineFeaturesStruct(v *compute.AdvancedMachineFeatures) []map[string]interface{} {
+	if v == nil {
+		return nil
+	}
+	m, err := structToMapJSON(v)
+	if err != nil {
+		return nil
+	}
+	return flattenAdvancedMachineFeatures(m)
+}
+
+func flattenShieldedVmConfig(shieldedVmConfig map[string]interface{}) []map[string]bool {
 	if shieldedVmConfig == nil {
 		return nil
 	}
 
+	getBool := func(k string) bool {
+		if b, ok := shieldedVmConfig[k].(bool); ok {
+			return b
+		}
+		return false
+	}
+
 	return []map[string]bool{{"{{"}}
-		"enable_secure_boot":          shieldedVmConfig.EnableSecureBoot,
-		"enable_vtpm":                 shieldedVmConfig.EnableVtpm,
-		"enable_integrity_monitoring": shieldedVmConfig.EnableIntegrityMonitoring,
+		"enable_secure_boot":          getBool("enableSecureBoot"),
+		"enable_vtpm":                 getBool("enableVtpm"),
+		"enable_integrity_monitoring": getBool("enableIntegrityMonitoring"),
 	{{"}}"}}
 }
 
-func expandDisplayDevice(d tpgresource.TerraformResourceData) *compute.DisplayDevice {
+// flattenShieldedVmConfigStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func flattenShieldedVmConfigStruct(v *compute.ShieldedInstanceConfig) []map[string]bool {
+	if v == nil {
+		return nil
+	}
+	m, err := structToMapJSON(v)
+	if err != nil {
+		return nil
+	}
+	return flattenShieldedVmConfig(m)
+}
+
+func expandDisplayDevice(d tpgresource.TerraformResourceData) map[string]interface{} {
 	if _, ok := d.GetOk("enable_display"); !ok {
 		return nil
 	}
-	return &compute.DisplayDevice{
+	typed := &compute.DisplayDevice{
 		EnableDisplay:   d.Get("enable_display").(bool),
 		ForceSendFields: []string{"EnableDisplay"},
 	}
+	m, err := structToMapJSON(typed)
+	if err != nil {
+		return nil
+	}
+	return m
 }
 
-func flattenEnableDisplay(displayDevice *compute.DisplayDevice) interface{} {
+// expandDisplayDeviceStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func expandDisplayDeviceStruct(d tpgresource.TerraformResourceData) *compute.DisplayDevice {
+	m := expandDisplayDevice(d)
+	if m == nil {
+		return nil
+	}
+	out := &compute.DisplayDevice{}
+	if err := mapToStructJSON(m, out); err != nil {
+		return nil
+	}
+	// ForceSendFields is not serialized to JSON; restore it to preserve
+	// the original typed helper's semantics.
+	out.ForceSendFields = []string{"EnableDisplay"}
+	return out
+}
+
+func flattenEnableDisplay(displayDevice map[string]interface{}) interface{} {
 	if displayDevice == nil {
 		return nil
 	}
+	b, _ := displayDevice["enableDisplay"].(bool)
+	return b
+}
 
-	return displayDevice.EnableDisplay
+// flattenEnableDisplayStruct is a temporary adapter.
+// TODO(migration): remove once all callers use map[string]interface{}.
+func flattenEnableDisplayStruct(v *compute.DisplayDevice) interface{} {
+	if v == nil {
+		return nil
+	}
+	m, err := structToMapJSON(v)
+	if err != nil {
+		return nil
+	}
+	return flattenEnableDisplay(m)
 }
 
 // Node affinity updates require a reboot

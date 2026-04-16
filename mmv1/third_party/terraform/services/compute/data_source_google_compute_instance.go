@@ -163,12 +163,12 @@ func dataSourceGoogleComputeInstanceRead(d *schema.ResourceData, meta interface{
 		return err
 	}
 
-	err = d.Set("shielded_instance_config", flattenShieldedVmConfig(instance.ShieldedInstanceConfig))
+	err = d.Set("shielded_instance_config", flattenShieldedVmConfigStruct(instance.ShieldedInstanceConfig))
 	if err != nil {
 		return err
 	}
 
-	err = d.Set("enable_display", flattenEnableDisplay(instance.DisplayDevice))
+	err = d.Set("enable_display", flattenEnableDisplayStruct(instance.DisplayDevice))
 	if err != nil {
 		return err
 	}
