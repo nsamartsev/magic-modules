@@ -1579,6 +1579,166 @@ func buildDisks(d *schema.ResourceData, config *transport_tpg.Config) ([]*comput
 	return disks, nil
 }
 
+func buildDisks_v2(d *schema.ResourceData, config *transport_tpg.Config) ([]interface{}, error) {
+	project, err := tpgresource.GetProject(d, config)
+	if err != nil {
+		return nil, err
+	}
+
+	userAgent, err := tpgresource.GenerateUserAgentString(d, config.UserAgent)
+	if err != nil {
+		return nil, err
+	}
+
+	disksCount := d.Get("disk.#").(int)
+
+	disks := make([]interface{}, 0, disksCount)
+	for i := 0; i < disksCount; i++ {
+		prefix := fmt.Sprintf("disk.%d", i)
+
+		disk := map[string]interface{}{
+			"boot":       i == 0,
+			"autoDelete": d.Get(prefix + ".auto_delete").(bool),
+		}
+
+		if v, ok := d.GetOk(prefix + ".boot"); ok {
+			disk["boot"] = v.(bool)
+		}
+		if v, ok := d.GetOk(prefix + ".device_name"); ok {
+			disk["deviceName"] = v.(string)
+		}
+
+		if _, ok := d.GetOk(prefix + ".disk_encryption_key"); ok {
+			diskEncryptionKey := map[string]interface{}{}
+			if v, ok := d.GetOk(prefix + ".disk_encryption_key.0.kms_key_self_link"); ok {
+				diskEncryptionKey["kmsKeyName"] = v.(string)
+			}
+			if v, ok := d.GetOk(prefix + ".disk_encryption_key.0.kms_key_service_account"); ok {
+				diskEncryptionKey["kmsKeyServiceAccount"] = v.(string)
+			}
+			disk["diskEncryptionKey"] = diskEncryptionKey
+		}
+
+		if v, ok := d.GetOk(prefix + ".disk_size_gb"); ok {
+			disk["diskSizeGb"] = v.(int)
+		}
+
+		if v, ok := d.GetOk(prefix + ".source"); ok {
+			disk["source"] = v.(string)
+			conflicts := []string{"disk_size_gb", "disk_name", "disk_type", "provisioned_iops", "provisioned_throughput", "source_image", "source_snapshot", "labels"}
+			for _, conflict := range conflicts {
+				if _, ok := d.GetOk(prefix + "." + conflict); ok {
+					return nil, fmt.Errorf("Cannot use `source` with any of the fields in %s", conflicts)
+				}
+			}
+		} else {
+			initializeParams := map[string]interface{}{}
+
+			if v, ok := d.GetOk(prefix + ".disk_name"); ok {
+				initializeParams["diskName"] = v.(string)
+			}
+			if v, ok := d.GetOk(prefix + ".disk_size_gb"); ok {
+				initializeParams["diskSizeGb"] = v.(int)
+			}
+			initializeParams["diskType"] = "pd-standard"
+			if v, ok := d.GetOk(prefix + ".disk_type"); ok {
+				initializeParams["diskType"] = v.(string)
+			}
+			if v, ok := d.GetOk(prefix + ".provisioned_iops"); ok {
+				initializeParams["provisionedIops"] = v.(int)
+			}
+			if v, ok := d.GetOk(prefix + ".provisioned_throughput"); ok {
+				initializeParams["provisionedThroughput"] = v.(int)
+			}
+			if _, ok := d.GetOk(prefix + ".resource_manager_tags"); ok {
+				initializeParams["resourceManagerTags"] = tpgresource.ExpandStringMap(d, prefix+".resource_manager_tags")
+			}
+			initializeParams["labels"] = tpgresource.ExpandStringMap(d, prefix+".labels")
+
+			if v, ok := d.GetOk(prefix + ".source_image"); ok {
+				imageName := v.(string)
+				imageUrl, err := ResolveImage(config, project, imageName, userAgent)
+				if err != nil {
+					return nil, fmt.Errorf("Error resolving image name '%s': %s", imageName, err)
+				}
+				initializeParams["sourceImage"] = imageUrl
+			}
+
+			if _, ok := d.GetOk(prefix + ".source_image_encryption_key"); ok {
+				sourceImageEncryptionKey := map[string]interface{}{}
+				if v, ok := d.GetOk(prefix + ".source_image_encryption_key.0.raw_key"); ok {
+					sourceImageEncryptionKey["rawKey"] = v.(string)
+				}
+				if v, ok := d.GetOk(prefix + ".source_image_encryption_key.0.rsa_encrypted_key"); ok {
+					sourceImageEncryptionKey["rsaEncryptedKey"] = v.(string)
+				}
+				if v, ok := d.GetOk(prefix + ".source_image_encryption_key.0.kms_key_self_link"); ok {
+					sourceImageEncryptionKey["kmsKeyName"] = v.(string)
+				}
+				if v, ok := d.GetOk(prefix + ".source_image_encryption_key.0.kms_key_service_account"); ok {
+					sourceImageEncryptionKey["kmsKeyServiceAccount"] = v.(string)
+				}
+				initializeParams["sourceImageEncryptionKey"] = sourceImageEncryptionKey
+			}
+
+			if v, ok := d.GetOk(prefix + ".source_snapshot"); ok {
+				initializeParams["sourceSnapshot"] = v.(string)
+			}
+
+			if _, ok := d.GetOk(prefix + ".source_snapshot_encryption_key"); ok {
+				sourceSnapshotEncryptionKey := map[string]interface{}{}
+				if v, ok := d.GetOk(prefix + ".source_snapshot_encryption_key.0.raw_key"); ok {
+					sourceSnapshotEncryptionKey["rawKey"] = v.(string)
+				}
+				if v, ok := d.GetOk(prefix + ".source_snapshot_encryption_key.0.rsa_encrypted_key"); ok {
+					sourceSnapshotEncryptionKey["rsaEncryptedKey"] = v.(string)
+				}
+				if v, ok := d.GetOk(prefix + ".source_snapshot_encryption_key.0.kms_key_self_link"); ok {
+					sourceSnapshotEncryptionKey["kmsKeyName"] = v.(string)
+				}
+				if v, ok := d.GetOk(prefix + ".source_snapshot_encryption_key.0.kms_key_service_account"); ok {
+					sourceSnapshotEncryptionKey["kmsKeyServiceAccount"] = v.(string)
+				}
+				initializeParams["sourceSnapshotEncryptionKey"] = sourceSnapshotEncryptionKey
+			}
+
+			if _, ok := d.GetOk(prefix + ".resource_policies"); ok {
+				initializeParams["resourcePolicies"] = expandInstanceTemplateResourcePolicies(d, prefix+".resource_policies")
+			}
+
+			if v, ok := d.GetOk(prefix + ".storage_pool"); ok {
+				storagePoolUrl, err := ExpandStoragePoolUrl(v, d, config)
+				if err != nil {
+					return nil, err
+				}
+				initializeParams["storagePool"] = storagePoolUrl
+			}
+
+			disk["initializeParams"] = initializeParams
+		}
+
+		if v, ok := d.GetOk(prefix + ".interface"); ok {
+			disk["interface"] = v.(string)
+		}
+		if v, ok := d.GetOk(prefix + ".mode"); ok {
+			disk["mode"] = v.(string)
+		}
+		if v, ok := d.GetOk(prefix + ".type"); ok {
+			disk["type"] = v.(string)
+		}
+		if v, ok := d.GetOk(prefix + ".guest_os_features"); ok {
+			disk["guestOsFeatures"] = expandComputeInstanceGuestOsFeatures_v2(v.([]interface{}))
+		}
+		if v, ok := d.GetOk(prefix + ".architecture"); ok {
+			disk["architecture"] = v.(string)
+		}
+
+		disks = append(disks, disk)
+	}
+
+	return disks, nil
+}
+
 // We don't share this code with compute instances because instances want a
 // partial URL, but instance templates want the bare accelerator name (despite
 // the docs saying otherwise).
@@ -1608,6 +1768,28 @@ func expandInstanceTemplateGuestAccelerators(d tpgresource.TerraformResourceData
 		})
 	}
 
+	return guestAccelerators
+}
+
+func expandInstanceTemplateGuestAccelerators_v2(d tpgresource.TerraformResourceData, config *transport_tpg.Config) []interface{} {
+	configs, ok := d.GetOk("guest_accelerator")
+	if !ok {
+		return nil
+	}
+	accels := configs.([]interface{})
+	guestAccelerators := make([]interface{}, 0, len(accels))
+	for _, raw := range accels {
+		data := raw.(map[string]interface{})
+		if data["count"].(int) == 0 {
+			continue
+		}
+		guestAccelerators = append(guestAccelerators, map[string]interface{}{
+			"acceleratorCount": data["count"].(int),
+			// We can't use ParseAcceleratorFieldValue here because an instance
+			// template does not have a zone we can use.
+			"acceleratorType": data["type"].(string),
+		})
+	}
 	return guestAccelerators
 }
 
@@ -2260,6 +2442,28 @@ func expandResourceComputeInstanceTemplateScheduling(d *schema.ResourceData, met
 	// Make sure we have an appropriate value for OnHostMaintenance if Preemptible
 	if expanded.Preemptible && expanded.OnHostMaintenance == "" {
 		expanded.OnHostMaintenance = "TERMINATE"
+	}
+	return expanded, nil
+}
+
+func expandResourceComputeInstanceTemplateScheduling_v2(d *schema.ResourceData, meta interface{}) (map[string]interface{}, error) {
+	v, ok := d.GetOk("scheduling")
+	if !ok || v == nil {
+		return map[string]interface{}{
+			"onHostMaintenance": "MIGRATE",
+		}, nil
+	}
+
+	expanded, err := expandScheduling_v2(v)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure we have an appropriate value for onHostMaintenance if Preemptible
+	if preemptible, ok := expanded["preemptible"].(bool); ok && preemptible {
+		if ohm, ok := expanded["onHostMaintenance"].(string); !ok || ohm == "" {
+			expanded["onHostMaintenance"] = "TERMINATE"
+		}
 	}
 	return expanded, nil
 }
