@@ -495,6 +495,161 @@ func flattenComputePreemptionNoticeDuration(v *compute.Duration) []interface{} {
 }
 {{- end }}
 
+// ----------------------------------------------------------------------------
+// Scheduling cluster: V2 wrappers returning / accepting map[string]interface{}.
+//
+// These are thin adapters on top of the typed expand*/flatten* implementations
+// above. They exist so that future callers (in particular, call sites that
+// migrate to transport_tpg.SendRequest with a JSON map body) can operate on
+// maps without the typed implementations having to change.
+//
+// Each expand*V2 delegates to its typed counterpart and converts the resulting
+// struct to a map via structToMapJSON; this preserves ForceSendFields /
+// NullFields semantics because gensupport.MarshalJSON runs during the
+// conversion.
+//
+// Each flatten*V2 accepts a map (as produced by json.Unmarshal into
+// map[string]interface{} from an API response), converts it back to the typed
+// struct via mapToStructJSON, and delegates to the typed flatten implementation.
+// ----------------------------------------------------------------------------
+
+func expandSchedulingV2(v interface{}) (map[string]interface{}, error) {
+	typed, err := expandScheduling(v)
+	if err != nil || typed == nil {
+		return nil, err
+	}
+	return structToMapJSON(typed)
+}
+
+func expandComputeMaxRunDurationV2(v interface{}) (map[string]interface{}, error) {
+	typed, err := expandComputeMaxRunDuration(v)
+	if err != nil || typed == nil {
+		return nil, err
+	}
+	return structToMapJSON(typed)
+}
+
+func expandComputeOnInstanceStopActionV2(v interface{}) (map[string]interface{}, error) {
+	typed, err := expandComputeOnInstanceStopAction(v)
+	if err != nil || typed == nil {
+		return nil, err
+	}
+	return structToMapJSON(typed)
+}
+
+func expandComputeLocalSsdRecoveryTimeoutV2(v interface{}) (map[string]interface{}, error) {
+	typed, err := expandComputeLocalSsdRecoveryTimeout(v)
+	if err != nil || typed == nil {
+		return nil, err
+	}
+	return structToMapJSON(typed)
+}
+
+{{ if ne $.TargetVersionName `ga` -}}
+func expandGracefulShutdownV2(v interface{}) (map[string]interface{}, error) {
+	typed, err := expandGracefulShutdown(v)
+	if err != nil || typed == nil {
+		return nil, err
+	}
+	return structToMapJSON(typed)
+}
+
+func expandGracefulShutdownMaxDurationV2(v interface{}) (map[string]interface{}, error) {
+	typed, err := expandGracefulShutdownMaxDuration(v)
+	if err != nil || typed == nil {
+		return nil, err
+	}
+	return structToMapJSON(typed)
+}
+
+func expandComputePreemptionNoticeDurationV2(v interface{}) (map[string]interface{}, error) {
+	typed, err := expandComputePreemptionNoticeDuration(v)
+	if err != nil || typed == nil {
+		return nil, err
+	}
+	return structToMapJSON(typed)
+}
+{{- end }}
+
+func flattenSchedulingV2(resp map[string]interface{}) []map[string]interface{} {
+	if resp == nil {
+		return nil
+	}
+	typed := &compute.Scheduling{}
+	if err := mapToStructJSON(resp, typed); err != nil {
+		return nil
+	}
+	return flattenScheduling(typed)
+}
+
+func flattenComputeMaxRunDurationV2(v map[string]interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	typed := &compute.Duration{}
+	if err := mapToStructJSON(v, typed); err != nil {
+		return nil
+	}
+	return flattenComputeMaxRunDuration(typed)
+}
+
+func flattenOnInstanceStopActionV2(v map[string]interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	typed := &compute.SchedulingOnInstanceStopAction{}
+	if err := mapToStructJSON(v, typed); err != nil {
+		return nil
+	}
+	return flattenOnInstanceStopAction(typed)
+}
+
+func flattenComputeLocalSsdRecoveryTimeoutV2(v map[string]interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	typed := &compute.Duration{}
+	if err := mapToStructJSON(v, typed); err != nil {
+		return nil
+	}
+	return flattenComputeLocalSsdRecoveryTimeout(typed)
+}
+
+{{ if ne $.TargetVersionName `ga` -}}
+func flattenGracefulShutdownV2(v map[string]interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	typed := &compute.SchedulingGracefulShutdown{}
+	if err := mapToStructJSON(v, typed); err != nil {
+		return nil
+	}
+	return flattenGracefulShutdown(typed)
+}
+
+func flattenGracefulShutdownMaxDurationV2(v map[string]interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	typed := &compute.Duration{}
+	if err := mapToStructJSON(v, typed); err != nil {
+		return nil
+	}
+	return flattenGracefulShutdownMaxDuration(typed)
+}
+
+func flattenComputePreemptionNoticeDurationV2(v map[string]interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	typed := &compute.Duration{}
+	if err := mapToStructJSON(v, typed); err != nil {
+		return nil
+	}
+	return flattenComputePreemptionNoticeDuration(typed)
+}
+{{- end }}
+
 func flattenAccessConfigs(accessConfigs []*compute.AccessConfig) ([]map[string]interface{}, string) {
 	flattened := make([]map[string]interface{}, len(accessConfigs))
 	natIP := ""
