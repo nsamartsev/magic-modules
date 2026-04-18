@@ -2058,13 +2058,8 @@ func resourceComputeInstanceCreate(d *schema.ResourceData, meta interface{}) err
 		return err
 	}
 	log.Printf("[DEBUG] Loading zone: %s", z)
-	zone, err := config.NewComputeClient(userAgent).Zones.Get(
-		project, z).Do()
-	if err != nil {
-		return fmt.Errorf("Error loading zone '%s': %s", z, err)
-	}
 
-	instance, err := expandComputeInstance(project, d, config)
+	instance, err := expandComputeInstance_v2(project, d, config)
 	if err != nil {
 		return err
 	}
@@ -2077,24 +2072,33 @@ func resourceComputeInstanceCreate(d *schema.ResourceData, meta interface{}) err
 	{{- end }}
 
 	log.Printf("[INFO] Requesting instance creation")
-	op, err := config.NewComputeClient(userAgent).Instances.Insert(project, zone.Name, instance).Do()
+	url := fmt.Sprintf("%sprojects/%s/zones/%s/instances", config.ComputeBasePath, project, z)
+	res, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+		Config:    config,
+		Method:    "POST",
+		Project:   project,
+		RawURL:    url,
+		UserAgent: userAgent,
+		Body:      instance,
+		Timeout:   d.Timeout(schema.TimeoutCreate),
+	})
 	if err != nil {
 		return fmt.Errorf("Error creating instance: %s", err)
 	}
 
 	// Store the ID now
-	d.SetId(fmt.Sprintf("projects/%s/zones/%s/instances/%s", project, z, instance.Name))
+	d.SetId(fmt.Sprintf("projects/%s/zones/%s/instances/%s", project, z, instance["name"].(string)))
 
 	// Wait for the operation to complete
-	waitErr := ComputeOperationWaitTime(config, op, project, "instance to create", userAgent, d.Timeout(schema.TimeoutCreate))
-	if waitErr != nil {
+	err = ComputeOperationWaitTime(config, res, project, "instance to create", userAgent, d.Timeout(schema.TimeoutCreate))
+	if err != nil {
 		// The resource didn't actually create
 		d.SetId("")
-		return waitErr
+		return err
 	}
 
 	{{ if ne $.TargetVersionName `ga` -}}
-	err = computeInstanceAddSecurityPolicy(d, config, securityPolicies, project, z, userAgent, instance.Name)
+	err = computeInstanceAddSecurityPolicy(d, config, securityPolicies, project, z, userAgent, instance["name"].(string))
 	if err != nil {
 		return fmt.Errorf("Error creating instance while setting the security policies: %s", err)
 	}
@@ -2107,7 +2111,7 @@ func resourceComputeInstanceCreate(d *schema.ResourceData, meta interface{}) err
 
 	if val, ok := d.GetOk("desired_status"); ok {
 		if val.(string) != "RUNNING" {
-			err = changeInstanceStatusOnCreation(config, d, project, zone.Name, val.(string), userAgent)
+			err = changeInstanceStatusOnCreation(config, d, project, z, val.(string), userAgent)
 			if err != nil {
 				return fmt.Errorf("Error changing instance status after creation: %s", err)
 			}
