@@ -2061,6 +2061,28 @@ func flattenReservationAffinity(affinity *compute.ReservationAffinity) []map[str
 	return []map[string]interface{}{flattened}
 }
 
+func flattenReservationAffinity_v2(v map[string]interface{}) []map[string]interface{} {
+	if v == nil {
+		return nil
+	}
+	reservationType, _ := v["consumeReservationType"].(string)
+	flattened := map[string]interface{}{
+		"type": reservationType,
+	}
+	if reservationType == "SPECIFIC_RESERVATION" {
+		key, _ := v["key"].(string)
+		var values []interface{}
+		if vals, ok := v["values"].([]interface{}); ok {
+			values = vals
+		}
+		flattened["specific_reservation"] = []map[string]interface{}{{"{"}}
+			"key":    key,
+			"values": values,
+		{{"}}"}}
+	}
+	return []map[string]interface{}{flattened}
+}
+
 func expandNetworkPerformanceConfig(d tpgresource.TerraformResourceData, config *transport_tpg.Config) (*compute.NetworkPerformanceConfig, error) {
 	configs, ok := d.GetOk("network_performance_config")
 	if !ok {
@@ -2118,6 +2140,23 @@ func flattenComputeInstanceGuestOsFeatures(v interface{}) []interface{} {
 	return result
 }
 
+func flattenComputeInstanceGuestOsFeatures_v2(features []interface{}) []interface{} {
+	if features == nil {
+		return nil
+	}
+	var result []interface{}
+	for _, raw := range features {
+		feature, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if t, ok := feature["type"].(string); ok && t != "" {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
 func expandComputeInstanceGuestOsFeatures(v interface{}) []*compute.GuestOsFeature {
 	if v == nil {
 		return nil
@@ -2149,6 +2188,17 @@ func flattenNetworkPerformanceConfig(c *compute.NetworkPerformanceConfig) []map[
 	return []map[string]interface{}{
 		{
 			"total_egress_bandwidth_tier": c.TotalEgressBandwidthTier,
+		},
+	}
+}
+
+func flattenNetworkPerformanceConfig_v2(v map[string]interface{}) []map[string]interface{} {
+	if v == nil {
+		return nil
+	}
+	return []map[string]interface{}{
+		{
+			"total_egress_bandwidth_tier": v["totalEgressBandwidthTier"],
 		},
 	}
 }
@@ -2190,6 +2240,22 @@ func flattenComputeInstanceEncryptionKey(v *compute.CustomerEncryptionKey) []map
 			"kms_key_self_link": 	   v.KmsKeyName,
 			"sha256":            	   v.Sha256,
 			"kms_key_service_account": v.KmsKeyServiceAccount,
+		},
+	}
+}
+
+func flattenComputeInstanceEncryptionKey_v2(v map[string]interface{}) []map[string]interface{} {
+	if v == nil {
+		return nil
+	}
+	kmsKeyName, _ := v["kmsKeyName"].(string)
+	sha256, _ := v["sha256"].(string)
+	kmsKeyServiceAccount, _ := v["kmsKeyServiceAccount"].(string)
+	return []map[string]interface{}{
+		{
+			"kms_key_self_link":        kmsKeyName,
+			"sha256":                   sha256,
+			"kms_key_service_account": kmsKeyServiceAccount,
 		},
 	}
 }

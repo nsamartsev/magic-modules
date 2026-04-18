@@ -125,6 +125,25 @@ func flattenMetadataBeta(metadata *compute.Metadata) map[string]string {
 	return metadataMap
 }
 
+func flattenMetadataBeta_v2(metadata map[string]interface{}) map[string]string {
+	metadataMap := make(map[string]string)
+	if metadata == nil {
+		return metadataMap
+	}
+	if items, ok := metadata["items"].([]interface{}); ok {
+		for _, raw := range items {
+			kv, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			key, _ := kv["key"].(string)
+			value, _ := kv["value"].(string)
+			metadataMap[key] = value
+		}
+	}
+	return metadataMap
+}
+
 // This function differs from flattenMetadataBeta only in that it takes
 // compute.metadata rather than compute.metadata as an argument. It should
 // be removed in favour of flattenMetadataBeta if/when all resources using it get
@@ -271,6 +290,21 @@ func flattenPartnerMetadata(partnerMetadata map[string]compute.StructuredEntries
 			partnerMetadataMap[key] = string(jsonString)
 		}
 
+	}
+	return partnerMetadataMap, nil
+}
+
+func flattenPartnerMetadata_v2(partnerMetadata map[string]interface{}) (map[string]string, error) {
+	partnerMetadataMap := make(map[string]string)
+	for key, value := range partnerMetadata {
+		if value == nil {
+			continue
+		}
+		jsonString, err := json.Marshal(value)
+		if err != nil {
+			return nil, err
+		}
+		partnerMetadataMap[key] = string(jsonString)
 	}
 	return partnerMetadataMap, nil
 }
